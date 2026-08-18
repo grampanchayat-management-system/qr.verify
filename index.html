@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ग्रामपंचायत — प्रमाणपत्र तपासणी</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700;800&family=Noto+Serif+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans Devanagari',sans-serif;min-height:100vh;
+  background:linear-gradient(135deg,#0D2B5E 0%,#1a3d7c 50%,#1a5c2a 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+.tricolor{position:fixed;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,#FF6B00 33.3%,#fff 33.3%,#fff 66.6%,#4CAF50 66.6%)}
+.card{width:100%;max-width:520px;background:#fff;border-radius:16px;
+  padding:28px 24px;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:up .4s ease}
+@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.logo{text-align:center;margin-bottom:20px}
+.logo-icon{font-size:36px;margin-bottom:6px}
+.logo h1{font-family:'Noto Serif Devanagari',serif;font-size:18px;font-weight:700;color:#0D2B5E}
+.logo p{font-size:11px;color:#666}
+
+/* VALID */
+.valid-banner{background:#e8f5e9;border:2px solid #4CAF50;border-radius:10px;
+  padding:14px;text-align:center;margin-bottom:16px}
+.valid-icon{font-size:36px;margin-bottom:4px}
+.valid-title{font-size:15px;font-weight:700;color:#1a5c2a}
+.valid-sub{font-size:11px;color:#2d7a40;margin-top:3px}
+
+/* CERT TABLE */
+.cert-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.cert-table tr:nth-child(even){background:#f9f9f9}
+.cert-table td{padding:9px 10px;border-bottom:1px solid #eee}
+.cert-table td:first-child{font-weight:700;color:#0D2B5E;width:42%;font-size:12px}
+.cert-title{font-size:14px;font-weight:700;color:#0D2B5E;margin-bottom:8px;
+  padding-bottom:6px;border-bottom:2px solid #FF6B00}
+
+/* GP INFO */
+.gp-info{background:#f5f5f5;border-radius:8px;padding:10px 14px;
+  font-size:11px;color:#666;text-align:center;margin-top:14px}
+
+.err{background:#ffebee;color:#c62828;padding:12px;border-radius:8px;text-align:center;font-size:13px}
+.footer{color:rgba(255,255,255,.5);font-size:11px;margin-top:16px;text-align:center}
+</style>
+</head>
+<body>
+<div class="tricolor"></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🏛️</div>
+    <h1>ग्रामपंचायत व्यवस्थापन प्रणाली</h1>
+    <p>Certificate Verification | प्रमाणपत्र तपासणी | Maharashtra</p>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<div class="footer">ग्रामपंचायत सॉफ्टवेअर | Maharashtra</div>
+
+<script>
+// Self-contained verification: every detail needed to show this page is carried
+// in the QR link itself (as URL parameters) — no server or database lookup required.
+// So this page works the moment it's hosted anywhere (e.g. GitHub Pages), for free.
+
+// हे एकच verify.html पान — एकदाच होस्ट केलेलं — सगळ्या ग्रामपंचायतींसाठी वापरता येतं.
+// प्रत्येक QR मध्ये त्या-त्या ग्रामपंचायतीचं नाव सोबतच येतं, त्यामुळे इथे कुठलंही नाव
+// हार्डकोड करायची गरज नाही — वेगळी वेबसाईट/वेगळं होस्टिंग प्रत्येक ग्रामपंचायतीसाठी लागत नाही.
+
+const TYPE_LABELS = {
+  8:  { mr:'नमुना ८ — कर आकारणी दाखला', icon:'📋' },
+  namuna8:  { mr:'नमुना ८ — कर आकारणी दाखला', icon:'📋' },
+  birth: { mr:'नमुना ५ — जन्म प्रमाणपत्र', icon:'👶' },
+  death: { mr:'नमुना ६ — मृत्यू प्रमाणपत्र', icon:'🕊️' },
+  vivah: { mr:'विवाह प्रमाणपत्र', icon:'💍' },
+  bpl: { mr:'दारिद्र्य रेषेखालील दाखला', icon:'📄' },
+  nodue: { mr:'येणे बाकी नसल्याचा दाखला', icon:'📄' },
+  niradhar: { mr:'निराधार प्रमाणपत्र', icon:'📄' }
+};
+
+// प्रत्येक प्रमाणपत्र-प्रकारासाठी वेगळे रकाने व त्यांचा क्रम — नवीन प्रकार जोडायचा असल्यास
+// इथे फक्त एक नवीन ओळ जोडायची (आणि app.html मध्ये त्याच अक्षरांचे URL parameter वापरायचे)
+const FIELD_LABELS_BY_TYPE = {
+  '8': { g:'ग्रामपंचायत', c:'दाखला क्र.', o:'नाव', f:'ग्रामपंचायत अधिकारी', d:'दिनांक' },
+  namuna8: { g:'ग्रामपंचायत', c:'दाखला क्र.', o:'नाव', f:'ग्रामपंचायत अधिकारी', d:'दिनांक' },
+  birth: {
+    g:'ग्रामपंचायत', tl:'तालुका', di:'जिल्हा', c:'प्रमाणपत्र क्र.', n:'बाळाचे नाव', s:'लिंग', b:'जन्म तारीख',
+    mo:'आईचे नाव', fa:'वडिलांचे नाव', r:'नोंदणी क्रमांक', of:'ग्रामसेवक', d:'दिनांक'
+  },
+  death: {
+    g:'ग्रामपंचायत', tl:'तालुका', di:'जिल्हा', c:'प्रमाणपत्र क्र.', n:'मृत व्यक्तीचे नाव', s:'लिंग', dd:'मृत्यू तारीख',
+    r:'नोंदणी क्रमांक', of:'ग्रामसेवक', d:'दिनांक'
+  },
+  vivah: {
+    g:'ग्रामपंचायत', tl:'तालुका', di:'जिल्हा', c:'प्रमाणपत्र क्र.', h:'पतीचे नाव', w:'पत्नीचे नाव',
+    vd:'विवाह तारीख', r:'अनुक्रमांक', of:'ग्रामसेवक', d:'दिनांक'
+  },
+  bpl: {
+    g:'ग्रामपंचायत', tl:'तालुका', di:'जिल्हा', c:'दाखला क्र.', n:'नाव', p:'वर्ष', bn:'यादी क्रमांक',
+    of:'ग्रामसेवक', d:'दिनांक'
+  },
+  nodue: {
+    g:'ग्रामपंचायत', tl:'तालुका', di:'जिल्हा', c:'दाखला क्र.', n:'नाव', of:'ग्रामसेवक', d:'दिनांक'
+  },
+  niradhar: {
+    g:'ग्रामपंचायत', tl:'तालुका', di:'जिल्हा', c:'दाखला क्र.', n:'नाव', ag:'वय', of:'ग्रामसेवक', d:'दिनांक'
+  }
+};
+// प्रत्येक प्रकारासाठी रकाने दाखवायचा क्रम — वरील ऑब्जेक्टच्याच key च्या क्रमाने आपोआप ठरतो
+function fieldOrderFor(type){
+  const m = FIELD_LABELS_BY_TYPE[type];
+  return m ? Object.keys(m) : ['g','c','o','f','d'];
+}
+
+function esc(s){
+  const d=document.createElement('div');d.textContent=s;return d.innerHTML;
+}
+
+window.addEventListener('load', () => {
+  const params = new URLSearchParams(window.location.search);
+  const type = params.get('t') || params.get('type') || '8';
+  const labels = FIELD_LABELS_BY_TYPE[type] || FIELD_LABELS_BY_TYPE['8'];
+  const order = fieldOrderFor(type);
+
+  const has = order.some(k => params.get(k));
+  if(!has){
+    document.getElementById('content').innerHTML =
+      '<div class="err">⚠️ QR Code मध्ये माहिती सापडली नाही. चुकीचा QR Code स्कॅन झाला आहे.</div>';
+    return;
+  }
+
+  const ct = TYPE_LABELS[type] || { mr:String(type), icon:'📄' };
+  let rows = '';
+  order.forEach(k => {
+    const v = params.get(k);
+    if(!v) return;
+    rows += '<tr><td>'+esc(labels[k]||k)+'</td><td>'+esc(v)+'</td></tr>';
+  });
+
+  document.getElementById('content').innerHTML = `
+    <div class="valid-banner">
+      <div class="valid-icon">✅</div>
+      <div class="valid-title">प्रमाणपत्र वैध आहे / Certificate is Valid</div>
+      <div class="valid-sub">हे प्रमाणपत्र ग्रामपंचायत प्रणालीमधून जारी करण्यात आले आहे</div>
+    </div>
+    <div class="cert-title">${ct.icon} ${esc(ct.mr)}</div>
+    <table class="cert-table">${rows}</table>
+    <div class="gp-info">
+      📍 हे प्रमाणपत्र ग्रामपंचायत व्यवस्थापन प्रणालीद्वारे जारी केले आहे.<br>
+      This certificate is issued via Grampanchayat Management System, Maharashtra.
+    </div>`;
+});
+</script>
+</body>
+</html>
