@@ -116,8 +116,44 @@ function esc(s){
   const d=document.createElement('div');d.textContent=s;return d.innerHTML;
 }
 
+// ── Cloud verify: QR मध्ये फक्त ?i=ID असतो; माहिती मोफत Firebase Firestore मधून येते (CRS सारखे) ──
+// app.html मधील HC_CLOUD_PROJECT / HC_CLOUD_KEY शी हे दोन्ही सारखेच असले पाहिजेत.
+const CLOUD_PROJECT = '';
+const CLOUD_KEY = '';
+const CLOUD_ROWS = {
+  birth: [['c','प्रमाणपत्र क्र. / Certificate No.'],['r','नोंदणी क्रमांक / Registration Number'],['n','नाव / Name'],['sx','लिंग / Sex'],['b','जन्म दिनांक / DOB'],['bw',''],['mo','आईचे नाव / Name of Mother'],['fa','वडिलांचे नाव / Name of Father'],['pl','जन्म ठिकाण / Place of Birth'],['rd','नोंदणी दिनांक / Registration Date'],['gn','ग्रामपंचायत / Registration Unit'],['tl','तालुका'],['di','जिल्हा'],['is','दाखला दिनांक / Date of Issue'],['of','अधिकारी']],
+  death: [['c','प्रमाणपत्र क्र. / Certificate No.'],['r','नोंदणी क्रमांक / Registration Number'],['n','नाव / Name of Deceased'],['sx','लिंग / Sex'],['ag','वय / Age'],['dd','मृत्यू दिनांक / Date of Death'],['dw',''],['pl','मृत्यूचे ठिकाण / Place of Death'],['sp','पती/पत्नी / Husband-Wife'],['mo','आईचे नाव / Name of Mother'],['fa','वडिलांचे नाव / Name of Father'],['rd','नोंदणी दिनांक / Registration Date'],['gn','ग्रामपंचायत / Registration Unit'],['tl','तालुका'],['di','जिल्हा'],['is','दाखला दिनांक / Date of Issue'],['of','अधिकारी']]
+};
+async function loadCloud(id,proj,key){
+  const box = document.getElementById('content');
+  box.innerHTML = '<div class="gp-info">⏳ तपासणी सुरू आहे… / Verifying…</div>';
+  try{
+    if(!proj||!key) throw new Error('not-configured');
+    const r = await fetch('https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(proj)+'/databases/(default)/documents/certs/'+encodeURIComponent(id)+'?key='+encodeURIComponent(key));
+    if(r.status===404||r.status===403){ box.innerHTML='<div class="err">❌ हे प्रमाणपत्र आढळले नाही. QR चुकीचा असू शकतो, किंवा प्रमाणपत्र नुकतेच छापले असल्यास थोड्या वेळाने पुन्हा तपासा.<br>Certificate not found.</div>'; return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json(), f = j.fields||{}, v = k => (f[k]&&f[k].stringValue)||'';
+    const t = v('t'), rows = CLOUD_ROWS[t];
+    if(!rows) throw new Error('bad-type');
+    let html='';
+    rows.forEach(([k,lab])=>{ const val=v(k); if(!val) return;
+      html += lab ? '<tr><td>'+esc(lab)+'</td><td>'+esc(val)+'</td></tr>' : '<tr><td></td><td>'+esc(val)+'</td></tr>'; });
+    const ct = TYPE_LABELS[t] || {mr:t,icon:'📄'};
+    box.innerHTML = `
+      <div class="valid-banner"><div class="valid-icon">✅</div>
+        <div class="valid-title">प्रमाणपत्र वैध आहे / Certificate is Valid</div>
+        <div class="valid-sub">हे प्रमाणपत्र ग्रामपंचायत प्रणालीमधून जारी करण्यात आले आहे</div></div>
+      <div class="cert-title">${ct.icon} ${esc(ct.mr)}</div>
+      <table class="cert-table">${html}</table>
+      <div class="gp-info">📍 This certificate is issued via Grampanchayat Management System, Maharashtra.<br>डेटा स्रोत / Data source: ${esc(proj)}</div>`;
+  }catch(e){
+    box.innerHTML='<div class="err">⚠️ सध्या तपासणी करता आली नाही. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.<br>Unable to verify right now.</div>';
+  }
+}
+
 window.addEventListener('load', () => {
   const params = new URLSearchParams(window.location.search);
+  if(params.get('i')){ loadCloud(params.get('i'), params.get('p')||CLOUD_PROJECT, params.get('k')||CLOUD_KEY); return; }
   const type = params.get('t') || params.get('type') || '8';
   const labels = FIELD_LABELS_BY_TYPE[type] || FIELD_LABELS_BY_TYPE['8'];
   const order = fieldOrderFor(type);
